@@ -65,13 +65,3 @@ GitHub | LinkedIn
 This project is licensed under the MIT License.
 
 ---
-
-# How to add and push README.md to GitHub
-
-1. Save your README.md file in your project root directory (`/Users/carsell/LemFi/`).
-
-2. In your terminal, run:
-
-git add README.md
-git commit -m "Add polished README with project overview and instructions"
-git push origin main
