@@ -57,11 +57,11 @@ Flagged transaction trends for compliance
 
 Risk scoring and KYC status tracking
 
-###Author
+### Author
 Carsell Olukoya
 GitHub | LinkedIn
 
-###License
+### License
 This project is licensed under the MIT License.
 
 ---
