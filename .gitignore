@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (optional, to reduce repo size)
+data/*.csv
+dbt/seeds/*.csv
