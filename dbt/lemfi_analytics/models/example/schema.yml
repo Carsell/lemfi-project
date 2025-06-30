@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: stg_users
+    description: "Staging model for user data loaded from raw CSV seed."
+    columns:
+      - name: user_id
+        description: "Unique identifier for each user."
+        tests:
+          - unique
+          - not_null
+      - name: full_name
+        description: "User’s full name."
+      - name: email
+        description: "User’s email address."
+      - name: created_at
+        description: "Date the user signed up."
+      - name: country
+        description: "User’s country of residence."
+      - name: kyc_status
+        description: "Current KYC verification status."
+      - name: kyc_method
+        description: "KYC method used by user."
+      - name: tenure_days
+        description: "Number of days user has been active."
+      - name: risk_score
+        description: "Risk score assigned to user."
+  
+  - name: stg_transactions
+    description: "Staging model for transaction data loaded from raw CSV seed."
+    columns:
+      - name: transaction_id
+        description: "Unique transaction identifier."
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        description: "User who made the transaction."
+        tests:
+          - not_null
+      - name: created_at
+        description: "Timestamp of the transaction."
+      - name: country
+        description: "Sending country of the transaction."
+      - name: currency
+        description: "Sending currency."
+      - name: transaction_amount
+        description: "Amount sent in the original currency."
+      - name: converted_amount
+        description: "Amount converted to receiving currency."
+      - name: transaction_type
+        description: "Type of transaction."
+      - name: device
+        description: "Device used to make the transaction."
+      - name: is_flagged
+        description: "Indicates if transaction was flagged."
+      - name: exchange_rate
+        description: "Exchange rate applied."
+      - name: compliance_result
+        description: "Result of compliance check."
+
+  - name: user_verified_growth
+    description: "Monthly count of users who are verified via KYC."
+    columns:
+      - name: month
+        description: "Month of user signup."
+      - name: verified_users
+        description: "Number of verified users in the month."
+
+  - name: transaction_volume_by_country
+    description: "Monthly sum of transaction amounts by sending country."
+    columns:
+      - name: country
+        description: "Sending country for the transaction."
+      - name: month
+        description: "Month of the transaction."
+      - name: total_volume
+        description: "Sum of transaction amounts for the month and country."

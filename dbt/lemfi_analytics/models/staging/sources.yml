@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw
+    database: fintech_analytics
+    schema: public
+    tables:
+      - name: raw_users
+      - name: raw_transactions
+
