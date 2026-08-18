@@ -1,0 +1,7 @@
+measure,note,value
+Rows in source extract,,76337
+Rows after cleaning,,75737
+Rows removed by cleaning,,600
+Transactions failing FX reconciliation,"quarantined from value totals, still counted",150
+Transactions flagged as suspicious,,2832
+Distinct users,,9339

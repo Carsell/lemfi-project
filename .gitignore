@@ -15,3 +15,11 @@ tests_py/
 data/raw/
 data/clean/
 dbt/lemfi_analytics/seeds/*.csv
+
+# dbt build artefact. `dbt build` recreates it from the models.
+*.duckdb
+
+# The BI fact table is derived from data/clean/ and is 6MB. `python bi/build_bi_model.py`
+# recreates it. The small dimensions, the quality log, the layout PNG and the README are
+# committed, because those are what someone reading the repo actually looks at.
+bi/fact_transactions.csv
