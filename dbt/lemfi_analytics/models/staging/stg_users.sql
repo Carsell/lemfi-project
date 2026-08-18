@@ -1,19 +1,11 @@
-with source as (
-    select * from {{ source('raw', 'raw_users') }}
-),
+-- One row per user, read straight from the CSV written by `python run.py`.
+with source as (select * from {{ source('lemfi', 'users') }})
 
-renamed as (
-    select
-        user_id,
-        name as full_name,
-        email,
-        signup_date as created_at,
-        country,
-        kyc_status,
-        kyc_method,
-        tenure_days,
-        risk_score
-    from source
-)
-
-select * from renamed
+select
+    user_id,
+    cast(signup_date as date)              as signed_up_on,
+    coalesce(home_country, 'Unknown')      as home_country,
+    kyc_status,
+    kyc_method,
+    kyc_status = 'Verified'                as is_verified
+from source

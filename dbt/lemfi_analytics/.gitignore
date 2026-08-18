@@ -2,3 +2,7 @@
 target/
 dbt_packages/
 logs/
+lemfi.duckdb
+logs/
+target/
+.user.yml

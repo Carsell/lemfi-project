@@ -1,12 +1,17 @@
-# Python
 __pycache__/
 *.pyc
-venv/
-.env
-
-# Jupyter
 .ipynb_checkpoints/
+.DS_Store
+.venv/
+target/
+dbt_packages/
+logs/
+PUSH_INSTRUCTIONS.md
+tests_py/
 
-# Data (optional, to reduce repo size)
-data/*.csv
-dbt/seeds/*.csv
+# Generated data. `python run.py` reproduces all of it from a fixed seed, so committing
+# 60MB+ of CSV would add weight without adding information. This is why the repo used to
+# be 116MB with the same rows stored twice.
+data/raw/
+data/clean/
+dbt/lemfi_analytics/seeds/*.csv

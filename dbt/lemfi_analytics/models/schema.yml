@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: stg_users
+    description: One row per user, lightly renamed from the seed.
+    columns:
+      - name: user_id
+        description: Primary key.
+        tests: [unique, not_null]
+      - name: kyc_status
+        tests:
+          - accepted_values:
+              values: ['Verified', 'Pending', 'Failed']
+      - name: kyc_method
+        tests:
+          - accepted_values:
+              values: ['Document Upload', 'Bank Verification', 'Utility Bill']
+      - name: home_country
+        description: Nulls are filled with 'Unknown' upstream, so this must never be null.
+        tests: [not_null]
+
+  - name: stg_transactions
+    description: One row per transaction. Ground truth is deliberately not carried here.
+    columns:
+      - name: transaction_id
+        description: Primary key. Duplicates are removed in the Python pipeline.
+        tests: [unique, not_null]
+      - name: user_id
+        description: Every transaction must belong to a user that exists.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_users')
+              field: user_id
+      - name: amount_gbp
+        tests: [not_null]
+      - name: send_country
+        tests:
+          - accepted_values:
+              values: ['NG', 'GH', 'KE', 'UG']
+      - name: receive_country
+        tests:
+          - accepted_values:
+              values: ['UK', 'US', 'CA']
+
+  - name: fct_user_daily_activity
+    description: >
+      One row per user per day. This is the grain at which structuring becomes visible;
+      at transaction grain it is invisible by construction.
+    columns:
+      - name: transfers
+        tests: [not_null]
+      - name: looks_like_structuring
+        tests: [not_null]
+
+  - name: fct_corridor_monthly
+    columns:
+      - name: corridor
+        tests: [not_null]
+      - name: volume_gbp
+        tests: [not_null]
+
+  - name: fct_kyc_funnel
+    columns:
+      - name: users
+        tests: [not_null]

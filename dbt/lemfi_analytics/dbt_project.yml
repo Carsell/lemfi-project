@@ -24,13 +24,19 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 
 # Configuring models
-# Full documentation: https://docs.getdbt.com/docs/configuring-models
-
-# In this example config, we tell dbt to build all models in the example/
-# directory as views. These settings can be overridden in the individual model
-# files using the `{{ config(...) }}` macro.
 models:
   lemfi_analytics:
-    # Config indicated by + and applies to all files under models/example/
-    example:
+    staging:
       +materialized: view
+    marts:
+      +materialized: table
+
+vars:
+  # The value structuring hides beneath. Kept here so the rule and the analysis cannot drift
+  # apart, which is exactly what happens when a threshold is typed into two places.
+  reporting_threshold: 10000
+
+flags:
+  # dbt phones home for anonymous usage stats on start. Harmless, but it can stall a first
+  # run on a slow or filtered network, which is indistinguishable from a hang.
+  send_anonymous_usage_stats: false

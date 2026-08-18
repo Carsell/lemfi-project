@@ -1,0 +1,10 @@
+# Kept inside the project on purpose, so anyone cloning this repo can run the dbt layer
+# without setting up a database or editing ~/.dbt/profiles.yml. DuckDB is a file, not a
+# server, so `dbt seed && dbt run && dbt test` works from a clean checkout.
+lemfi_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: lemfi.duckdb
+      threads: 4

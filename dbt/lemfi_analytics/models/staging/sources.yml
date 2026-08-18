@@ -1,10 +1,16 @@
 version: 2
 
+# dbt-duckdb can read CSV files directly, so the data is declared as an external source
+# rather than loaded with `dbt seed`.
+#
+# Why: `dbt seed` inserts row by row and is built for small lookup tables. Seeding ~76,000
+# transactions takes many minutes and looks like a hang. Reading the file in place is
+# instant, and it also keeps one copy of the data instead of a second one inside the
+# warehouse. The files are written by `python run.py`.
 sources:
-  - name: raw
-    database: fintech_analytics
-    schema: public
+  - name: lemfi
+    meta:
+      external_location: "../../data/clean/{name}.csv"
     tables:
-      - name: raw_users
-      - name: raw_transactions
-
+      - name: transactions
+      - name: users
