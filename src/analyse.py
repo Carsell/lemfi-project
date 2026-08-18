@@ -1,10 +1,11 @@
 """
-Clean the extract, then answer four compliance questions.
+Clean the extract, then answer five compliance questions.
 
   Q1. Where does the money actually move?
   Q2. How good is the flagging rule, and what does it cost to run at that quality?
   Q3. The rule fires hardest on new accounts. Is that where the risk is?
   Q4. What does a single-transaction rule structurally miss?
+  Q5. How do verification method and outcome relate to conversion and risk?
 
 Q4 is the one worth reading. Q2 and Q3 are about tuning a rule that exists; Q4 is about a
 category of behaviour the rule cannot see no matter how it is tuned, because the evidence
@@ -19,10 +20,11 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from config import (ALERT_AMOUNT_THRESHOLD_GBP, REVIEWER_DAILY_CAPACITY,
+                    SCENARIO_THRESHOLD_GBP)
 from validate import check_raw, check_analysis_ready
 
 RAW, CLEAN, FIG = Path("data/raw"), Path("data/clean"), Path("outputs/figures")
-THRESHOLD = 10_000.0
 plt.rcParams.update({"figure.dpi": 130, "font.size": 9, "axes.grid": True,
                      "grid.alpha": 0.25, "axes.spines.top": False,
                      "axes.spines.right": False})
@@ -55,19 +57,28 @@ def load_and_clean():
 # ------------------------------------------------------------------- questions
 
 def q1_corridors(txns, findings):
-    c = (txns.groupby(["send_country", "receive_country"])
-         .agg(volume_gbp=("amount_gbp", "sum"), transfers=("transaction_id", "count"))
+    volume = txns["amount_gbp"].where(txns["fx_reconciles"], 0)
+    valid = txns.loc[txns["fx_reconciles"]]
+    average_by_corridor = valid.groupby(
+        ["send_country", "receive_country"]
+    )["amount_gbp"].mean()
+    average_ratio = average_by_corridor.max() / average_by_corridor.min()
+    c = (txns.assign(valid_volume_gbp=volume)
+         .groupby(["send_country", "receive_country"])
+         .agg(volume_gbp=("valid_volume_gbp", "sum"),
+              transfers=("transaction_id", "count"),
+              excluded_fx_errors=("fx_reconciles", lambda s: (~s).sum()))
          .sort_values("volume_gbp", ascending=False))
     c["pct_volume"] = c["volume_gbp"] / c["volume_gbp"].sum() * 100
     top = c.index[0]
     findings.append(
         f"**Volume is concentrated in a few corridors.** {len(txns):,} transfers move "
-        f"£{txns['amount_gbp'].sum() / 1e6:.1f}m over six months. The largest corridor, "
+        f"£{c['volume_gbp'].sum() / 1e6:.1f}m over six months, excluding "
+        f"{c['excluded_fx_errors'].sum():,} FX-quarantined rows from value. The largest corridor, "
         f"{top[0]} to {top[1]}, carries {c.iloc[0]['pct_volume']:.0f}% of value on its own, "
         f"and the top three carry {c['pct_volume'].head(3).sum():.0f}%. Average transfer "
-        f"size varies more than three-fold across corridors, so a monitoring threshold set "
-        f"as a single global number will be far too loose in one place and far too tight in "
-        f"another.")
+        f"size varies {average_ratio:.1f}-fold across corridors, so the impact of a single "
+        f"global amount threshold should be checked by corridor rather than assumed.")
 
     fig, ax = plt.subplots(figsize=(6.4, 3.4))
     lbl = [f"{a}→{b}" for a, b in c.index]
@@ -85,22 +96,23 @@ def q2_alert_quality(txns, findings):
     precision, recall = tp / (tp + fp), tp / (tp + fn)
     base = txns.is_suspicious.mean()
 
-    # What the alert queue costs. A reviewer handles roughly 40 alerts a day.
+    # Illustrative workload assumption, kept explicit so it is not mistaken for observed data.
     alerts = tp + fp
     per_day = alerts / txns["date"].nunique()
-    reviewers = per_day / 40
+    reviewers = per_day / REVIEWER_DAILY_CAPACITY
 
     verdict = ("finds most of the risk and buries the team doing it" if recall >= 0.55
                else "finds about half the risk and buries the team doing it" if recall >= 0.35
                else "misses more than it finds, and still buries the team")
     findings.append(
         f"**The rule {verdict}.** Suspicious "
-        f"activity runs at {base:.2%} of transfers. The production rule flags "
+        f"activity runs at {base:.2%} of transfers. The simulated baseline rule flags "
         f"{txns.is_flagged.mean():.1%}, catching {recall:.0%} of genuinely suspicious "
         f"transfers at {precision:.0%} precision. In plain terms: {alerts:,} alerts over six "
         f"months, of which {fp:,} are false, and {fn:,} suspicious transfers are missed "
         f"entirely. That is roughly {per_day:.0f} alerts a day, about {reviewers:.1f} "
-        f"full-time reviewers, and more than three quarters of their day spent on transfers "
+        f"full-time reviewers at an illustrative {REVIEWER_DAILY_CAPACITY} reviews per day, "
+        f"and more than three quarters of their day spent on transfers "
         f"that turn out to be fine. Whether that is the right trade depends on what a missed "
         f"case costs relative to a review, and that number should come from the business "
         f"rather than from me.")
@@ -122,12 +134,13 @@ def q2_alert_quality(txns, findings):
     for t in grid:
         f = txns["amount_gbp"] > t
         p = (f & txns.is_suspicious).sum()
-        prec.append(p / max(f.sum(), 1))
+        prec.append(p / f.sum() if f.sum() else np.nan)
         rec.append(p / txns.is_suspicious.sum())
     axes[1].plot(grid, np.array(prec) * 100, label="precision")
     axes[1].plot(grid, np.array(rec) * 100, label="recall")
-    axes[1].axvline(6_000, color="grey", ls="--", lw=1)
-    axes[1].text(6_300, 60, "current\nthreshold", fontsize=7, color="grey")
+    axes[1].axvline(ALERT_AMOUNT_THRESHOLD_GBP, color="grey", ls="--", lw=1)
+    axes[1].text(ALERT_AMOUNT_THRESHOLD_GBP + 300, 60, "scenario\nthreshold",
+                 fontsize=7, color="grey")
     axes[1].set(xlabel="Amount threshold (£)", ylabel="%",
                 title="Moving the amount threshold alone")
     axes[1].legend(fontsize=8)
@@ -149,13 +162,13 @@ def q3_new_accounts(txns, findings):
                    f"{rate_young:.2%} of the time against {rate_old:.2%} for everyone else, "
                    f"{ratio:.1f} times higher. The age condition earns its place.")
     elif ratio > 1.1:
-        verdict = (f"**New accounts are slightly riskier, but not enough to justify the "
-                   f"alert volume.** Transfers from accounts under 14 days old are "
+        verdict = (f"**New accounts are slightly riskier, but the alert trade-off needs "
+                   f"testing.** Transfers from accounts under 14 days old are "
                    f"suspicious {rate_young:.2%} of the time against {rate_old:.2%} for "
-                   f"everyone else. That is a real but small elevation, and the rule spends "
-                   f"{share_of_alerts:.0%} of its alerts chasing it. Raising the amount "
-                   f"condition on new accounts would keep most of the benefit for a fraction "
-                   f"of the reviews.")
+                   f"everyone else. That is a real but small elevation, and "
+                   f"{share_of_alerts:.0%} of alerts involve an account under 14 days old. "
+                   f"A threshold sensitivity test by account age would show whether the "
+                   f"condition can be tightened without losing too much recall.")
     else:
         verdict = (f"**The rule watches new accounts and the risk is not there.** Transfers "
                    f"from accounts under 14 days old are suspicious {rate_young:.2%} of the "
@@ -185,39 +198,47 @@ def q4_structuring(txns, findings):
                   total_gbp=("amount_gbp", "sum"),
                   max_gbp=("amount_gbp", "max"),
                   any_flagged=("is_flagged", "any"),
-                  any_suspicious=("is_suspicious", "any"))
+                  any_suspicious=("is_suspicious", "any"),
+                  any_structuring=("is_structuring", "any"))
              .reset_index())
 
     # Structuring: several transfers in a day, each under the threshold, summing over it.
-    pattern = ((daily.n >= 3) & (daily.max_gbp < THRESHOLD) &
-               (daily.total_gbp > THRESHOLD))
+    pattern = ((daily.n >= 3) & (daily.max_gbp < SCENARIO_THRESHOLD_GBP) &
+               (daily.total_gbp > SCENARIO_THRESHOLD_GBP))
     hits = daily[pattern]
-    caught_by_rule = hits["any_flagged"].mean() if len(hits) else np.nan
-    truly = hits["any_suspicious"].mean() if len(hits) else np.nan
+    planted = daily["any_structuring"]
+    caught_by_rule = daily.loc[planted, "any_flagged"].mean() if planted.any() else np.nan
+    true_positives = int((pattern & planted).sum())
+    false_positives = int((pattern & ~planted).sum())
+    recall = true_positives / planted.sum() if planted.sum() else np.nan
+    precision = true_positives / len(hits) if len(hits) else np.nan
     value = hits["total_gbp"].sum()
 
     findings.append(
         f"**A single-transaction rule cannot see structuring, and there is structuring.** "
         f"Aggregating to one row per customer per day finds {len(hits):,} days where a user "
-        f"made three or more transfers, each below the £10,000 reporting threshold, together "
-        f"totalling more than it — £{value / 1e6:.1f}m in all. "
-        f"{truly:.0%} of those days involve genuinely suspicious activity. The production "
-        f"rule caught {caught_by_rule:.0%} of them. "
+        f"made three or more transfers, each below the £{SCENARIO_THRESHOLD_GBP:,.0f} "
+        f"scenario threshold, together totalling more than it — £{value / 1e6:.1f}m in all. "
+        f"In this controlled simulation the daily rule recovered {true_positives:,} of "
+        f"{int(planted.sum()):,} planted structuring days ({recall:.0%} recall) with "
+        f"{false_positives:,} false-positive days ({precision:.0%} precision). The simulated "
+        f"single-transaction rule caught {caught_by_rule:.0%} of them. "
         f"No amount of tuning the amount threshold fixes this, because every individual "
         f"transfer is unremarkable and the rule only ever looks at one at a time. The fix is "
-        f"a daily aggregate per customer, which is cheap to compute and is the single change "
-        f"I would make first.")
+        f"a daily aggregate per customer. These figures validate the scenario logic; they are "
+        f"not estimates of real-world detection performance.")
 
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.2))
     sample = daily[daily.n >= 2].sample(min(4000, (daily.n >= 2).sum()), random_state=1)
     axes[0].scatter(sample.n, sample.total_gbp, s=5, alpha=0.2, color="grey")
     axes[0].scatter(hits.n, hits.total_gbp, s=9, alpha=0.7, color="#c44e52")
-    axes[0].axhline(THRESHOLD, color="black", lw=1, ls="--")
+    axes[0].axhline(SCENARIO_THRESHOLD_GBP, color="black", lw=1, ls="--")
     axes[0].set(yscale="log", xlabel="Transfers by one user in one day",
                 ylabel="Day total (£)", title="Under the limit each, over it together")
-    axes[1].bar(["Flagged by\nthe rule", "Found by a\ndaily aggregate"],
-                [caught_by_rule * 100, 100], color=["#4c72b0", "#c44e52"])
-    axes[1].set(ylabel="% of structuring days detected", title="What each approach catches")
+    axes[1].bar(["Single-transaction\nbaseline", "Customer-day\nrule"],
+                [caught_by_rule * 100, recall * 100], color=["#4c72b0", "#c44e52"])
+    axes[1].set(ylabel="Recall of planted structuring days",
+                title=f"Daily rule: {precision:.0%} precision in this simulation")
     fig.tight_layout(); fig.savefig(FIG / "04_structuring.png"); plt.close(fig)
     return daily
 
@@ -240,10 +261,10 @@ def q5_kyc(txns, users, findings):
         f"matter and it is a real risk signal: suspicious activity runs at "
         f"{by_status.get('Failed', 0):.2f}% among users whose verification failed against "
         f"{by_status.get('Verified', 0):.2f}% among those who passed, roughly "
-        f"{ratio:.0f} times higher. Those two facts pull in opposite directions. Making "
-        f"utility-bill verification easier to pass would improve conversion and would also "
-        f"let through some of the users the failure was catching, so it is a decision about "
-        f"appetite rather than a straightforward improvement.")
+        f"{ratio:.0f} times higher. Those two facts pull in opposite directions. This "
+        f"aggregate comparison does not establish that changing a verification method would "
+        f"change later risk, so that decision needs an experiment or a controlled cohort "
+        f"analysis rather than a causal claim from this chart.")
 
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.2))
     by_method[["Verified", "Pending", "Failed"]].plot(
@@ -278,11 +299,11 @@ def main():
     # Exports. is_suspicious is ground truth and never leaves this folder.
     # `timestamp` is a reserved word in several SQL engines, so it is renamed on export
     # rather than quoted in every downstream model.
-    (txns.drop(columns=["is_suspicious"])
+    (txns.drop(columns=["is_suspicious", "is_structuring"])
          .rename(columns={"timestamp": "occurred_at", "date": "occurred_on"})
          .to_csv(CLEAN / "transactions.csv", index=False))
     users.to_csv(CLEAN / "users.csv", index=False)
-    daily.drop(columns=["any_suspicious"]).to_csv(
+    daily.drop(columns=["any_suspicious", "any_structuring"]).to_csv(
         CLEAN / "user_daily_activity.csv", index=False)
 
     with open("outputs/findings.md", "w") as f:

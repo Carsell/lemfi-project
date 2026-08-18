@@ -3,7 +3,7 @@
 -- A single-transaction rule cannot detect structuring, because each individual transfer is
 -- unremarkable. Aggregating to one row per customer per day is what makes the pattern
 -- visible, and it is cheap. `looks_like_structuring` is the candidate rule that comes out
--- of that: three or more transfers in a day, every one below the reporting threshold, and
+-- of that: three or more transfers in a day, every one below the synthetic scenario threshold, and
 -- a day total above it.
 {{ config(materialized='table') }}
 
@@ -23,6 +23,6 @@ with daily as (
 select
     *,
     transfers >= 3
-      and largest_gbp < {{ var('reporting_threshold') }}
-      and total_gbp  > {{ var('reporting_threshold') }} as looks_like_structuring
+      and largest_gbp < {{ var('scenario_threshold') }}
+      and total_gbp  > {{ var('scenario_threshold') }} as looks_like_structuring
 from daily

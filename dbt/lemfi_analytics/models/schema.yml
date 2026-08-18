@@ -10,11 +10,13 @@ models:
       - name: kyc_status
         tests:
           - accepted_values:
-              values: ['Verified', 'Pending', 'Failed']
+              arguments:
+                values: ['Verified', 'Pending', 'Failed']
       - name: kyc_method
         tests:
           - accepted_values:
-              values: ['Document Upload', 'Bank Verification', 'Utility Bill']
+              arguments:
+                values: ['Document Upload', 'Bank Verification', 'Utility Bill']
       - name: home_country
         description: Nulls are filled with 'Unknown' upstream, so this must never be null.
         tests: [not_null]
@@ -30,18 +32,21 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_users')
-              field: user_id
+              arguments:
+                to: ref('stg_users')
+                field: user_id
       - name: amount_gbp
         tests: [not_null]
       - name: send_country
         tests:
           - accepted_values:
-              values: ['NG', 'GH', 'KE', 'UG']
+              arguments:
+                values: ['UK', 'US', 'CA']
       - name: receive_country
         tests:
           - accepted_values:
-              values: ['UK', 'US', 'CA']
+              arguments:
+                values: ['NG', 'GH', 'KE', 'UG']
 
   - name: fct_user_daily_activity
     description: >

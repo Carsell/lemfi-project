@@ -1,15 +1,14 @@
-Welcome to your new dbt project!
+# LemFi analytics dbt project
 
-### Using the starter project
+The models read the cleaned CSV files created by `python run.py` and build three small marts
+in DuckDB. From the repository root:
 
-Try running the following commands:
-- dbt run
-- dbt test
+```bash
+pip install -r requirements-dev.txt
+python run.py
+cd dbt/lemfi_analytics
+dbt build --profiles-dir .
+```
 
-
-### Resources:
-- Learn more about dbt [in the docs](https://docs.getdbt.com/docs/introduction)
-- Check out [Discourse](https://discourse.getdbt.com/) for commonly asked questions and answers
-- Join the [chat](https://community.getdbt.com/) on Slack for live discussions and support
-- Find [dbt events](https://events.getdbt.com) near you
-- Check out [the blog](https://blog.getdbt.com/) for the latest news on dbt's development and best practices
+`dbt build` creates the staging views and marts, then runs the generic and singular tests.
+The committed local profile means no external database or `~/.dbt` configuration is needed.

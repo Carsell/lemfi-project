@@ -12,4 +12,4 @@ if __name__ == "__main__":
     analyse.main()
 
     print("\ndbt reads data/clean/*.csv directly as external sources, so there is no")
-    print("seed step. From dbt/lemfi_analytics: dbt run && dbt test")
+    print("seed step. From dbt/lemfi_analytics: dbt build --profiles-dir .")

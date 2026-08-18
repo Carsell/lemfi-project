@@ -1,0 +1,24 @@
+name: Validate analytics project
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Generate data and findings
+        run: python run.py
+      - name: Run Python tests
+        run: pytest -q
+      - name: Build and test dbt models
+        working-directory: dbt/lemfi_analytics
+        run: dbt build --profiles-dir .

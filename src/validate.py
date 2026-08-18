@@ -73,10 +73,12 @@ def check_analysis_ready(txns: pd.DataFrame, users: pd.DataFrame) -> None:
     if (txns["amount_gbp"] < 0).any():
         failures.append("negative transaction amounts")
 
-    # A ground-truth column must never reach a model or a mart. It does not exist in
-    # production, and a feature built on it would score perfectly and be useless.
-    if "is_suspicious" in txns.columns and "is_flagged" not in txns.columns:
-        failures.append("ground truth present without the production flag — check the join")
+    temporal = txns[["transaction_id", "user_id", "timestamp"]].merge(
+        users[["user_id", "signup_date"]], on="user_id", how="left", validate="many_to_one"
+    )
+    before_signup = temporal["timestamp"] < temporal["signup_date"] - pd.Timedelta(days=1)
+    if before_signup.any():
+        failures.append(f"{before_signup.sum()} transactions occur before user signup")
 
     if failures:
         raise DataQualityError("; ".join(failures))

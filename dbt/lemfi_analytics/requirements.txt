@@ -1,7 +1,1 @@
-pandas
-numpy
-faker
-dbt-core
-dbt-postgres
-notebook
-jupyterlab
+dbt-duckdb>=1.8,<2

@@ -32,9 +32,8 @@ models:
       +materialized: table
 
 vars:
-  # The value structuring hides beneath. Kept here so the rule and the analysis cannot drift
-  # apart, which is exactly what happens when a threshold is typed into two places.
-  reporting_threshold: 10000
+  # Synthetic scenario value, mirrored in src/config.py and checked by pytest.
+  scenario_threshold: 10000
 
 flags:
   # dbt phones home for anonymous usage stats on start. Harmless, but it can stall a first
